@@ -399,8 +399,7 @@ var worker = function (Url, Second, Version) {
                                     FavoTimeStamp: null,
                                     PlayedTimeStamp: null
                                 };
-
-                                InsertData = WorkerSetting.EachGameCode(gameCodeItem, InsertData);
+                                
 
                                 try {
                                     objectStore.put(InsertData);
