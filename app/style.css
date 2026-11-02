@@ -829,3 +829,118 @@ footer p {
     transition: none !important;
   }
 }
+.station-hub {
+  background: #f0f5ed;
+}
+.station-area {
+  padding-left: 25px;
+  border-left: 3px solid #d6e3d8;
+}
+.suggestion {
+  color: var(--green);
+  background: #f3f6ef;
+}
+.route-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+}
+.route-details > summary {
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--green);
+  padding: 12px 20px;
+  justify-content: space-between;
+}
+.route-details[open] .route-arrow {
+  transform: rotate(90deg);
+}
+.boarding-places {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding: 0 20px 14px;
+}
+.boarding-point {
+  min-width: 0;
+  border-left: 2px solid #b5cbb8;
+  padding-left: 12px;
+}
+.boarding-point + .boarding-point {
+  border-color: var(--orange);
+}
+.boarding-label {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+}
+.boarding-point strong {
+  font-size: 14px;
+}
+.boarding-point p {
+  font-size: 12px;
+  margin: 4px 0;
+  overflow-wrap: anywhere;
+}
+.boarding-point small {
+  font-size: 11px;
+  color: var(--muted);
+  display: block;
+}
+.map-link {
+  display: inline-block;
+  font-size: 12px;
+  margin-top: 7px;
+  text-underline-offset: 3px;
+}
+.map-note {
+  font-size: 10px;
+  color: var(--muted);
+  margin: 0 20px 12px;
+}
+.option-label {
+  display: block;
+  font-size: 11px;
+  margin: 0 20px 16px;
+  color: var(--muted);
+}
+.trip-options,
+.direction-select {
+  font: inherit;
+  width: 100%;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: white;
+  color: var(--ink);
+}
+.trip-options {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+}
+.direction-select {
+  display: block;
+  width: calc(100% - 40px);
+  margin: 0 20px 16px;
+  font-size: 13px;
+}
+@media (max-width: 500px) {
+  .boarding-places {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    padding-inline: 15px;
+  }
+  .route-header {
+    padding: 15px;
+    gap: 10px;
+  }
+  .option-label {
+    margin-inline: 15px;
+  }
+  .route-art {
+    display: none;
+  }
+}

@@ -1,0 +1,142 @@
+{
+  "capturedAt": "2026-11-02T20:17:02.998Z",
+  "sources": {
+    "routes": {
+      "url": "https://tcgbusfs.blob.core.windows.net/blobbus/GetRoute.gz",
+      "etag": "0x8DF391C507A37D5",
+      "modified": "Mon, 02 Nov 2026 20:03:08 GMT",
+      "updateTime": "2026/11/03 04:03:04"
+    },
+    "locations": {
+      "url": "https://tcgbusfs.blob.core.windows.net/blobbus/GetStopLocation.gz",
+      "etag": "0x8DF391C518B72DF",
+      "modified": "Mon, 02 Nov 2026 20:03:09 GMT",
+      "updateTime": "2026/11/03 04:03:04"
+    },
+    "stops": {
+      "url": "https://tcgbusfs.blob.core.windows.net/blobbus/GetStop.gz",
+      "etag": "0x8DF391C51558F4A",
+      "modified": "Mon, 02 Nov 2026 20:03:09 GMT",
+      "updateTime": "2026/11/03 03:42:55"
+    }
+  },
+  "officialName": "智光商職",
+  "noOfficialName": "志光商職",
+  "start": {
+    "count": 4,
+    "diameterMeters": 224
+  },
+  "end": {
+    "count": 7,
+    "diameterMeters": 395
+  },
+  "routeSearch": [
+    "262",
+    "262區"
+  ],
+  "forward": [
+    {
+      "route": "262",
+      "routeId": "10961",
+      "direction": "0",
+      "from": {
+        "station": "智光商職",
+        "stopId": "72406",
+        "rowId": "40527",
+        "sequence": 35,
+        "address": "中正路50號(向北)",
+        "routeRecordAddress": "中正路50號(向北)",
+        "lat": 24.994533,
+        "lon": 121.513228
+      },
+      "to": {
+        "station": "臺北車站(忠孝)",
+        "stopId": "1882",
+        "rowId": "40544",
+        "sequence": 51,
+        "address": "臺北市中正區忠孝西路一段50號（新光三越站前店前面）(向東)",
+        "routeRecordAddress": "忠孝西路一段台北車站南側",
+        "lat": 25.0465635496954,
+        "lon": 121.515689438859
+      }
+    },
+    {
+      "route": "262區",
+      "routeId": "10962",
+      "direction": "0",
+      "from": {
+        "station": "智光商職",
+        "stopId": "72406",
+        "rowId": "40654",
+        "sequence": 8,
+        "address": "中正路50號(向北)",
+        "routeRecordAddress": "中正路50號(向北)",
+        "lat": 24.994533,
+        "lon": 121.513228
+      },
+      "to": {
+        "station": "臺北車站(忠孝)",
+        "stopId": "1882",
+        "rowId": "40671",
+        "sequence": 24,
+        "address": "臺北市中正區忠孝西路一段50號（新光三越站前店前面）(向東)",
+        "routeRecordAddress": "臺北市中正區忠孝西路一段50號（新光三越站前店前面）(向東)",
+        "lat": 25.0465635496954,
+        "lon": 121.515689438859
+      }
+    }
+  ],
+  "reverse": [
+    {
+      "route": "262",
+      "routeId": "10961",
+      "direction": "1",
+      "from": {
+        "station": "臺北車站(忠孝)",
+        "stopId": "1000082",
+        "rowId": "40589",
+        "sequence": 94,
+        "address": "捷運臺北車站M5出口~M4出口(交7)(向西)",
+        "routeRecordAddress": "捷運臺北車站M5出口~M4出口(交7)(向西)",
+        "lat": 25.0465408,
+        "lon": 121.5167218
+      },
+      "to": {
+        "station": "智光商職",
+        "stopId": "3037",
+        "rowId": "40606",
+        "sequence": 111,
+        "address": "中和區安樂路73號(向南)",
+        "routeRecordAddress": "中正路64號",
+        "lat": 24.99403299,
+        "lon": 121.5125768
+      }
+    },
+    {
+      "route": "262區",
+      "routeId": "10962",
+      "direction": "1",
+      "from": {
+        "station": "臺北車站(忠孝)",
+        "stopId": "1000082",
+        "rowId": "40716",
+        "sequence": 67,
+        "address": "捷運臺北車站M5出口~M4出口(交7)(向西)",
+        "routeRecordAddress": "捷運臺北車站M5出口~M4出口(交7)(向西)",
+        "lat": 25.0465408,
+        "lon": 121.5167218
+      },
+      "to": {
+        "station": "智光商職",
+        "stopId": "3037",
+        "rowId": "40733",
+        "sequence": 84,
+        "address": "中和區安樂路73號(向南)",
+        "routeRecordAddress": "中正路64號(向南)",
+        "lat": 24.99403299,
+        "lon": 121.5125768
+      }
+    }
+  ],
+  "note": "由官方原始列獨立配對後，與新查詢結果逐筆核對。地址顯示優先使用站位檔，routeRecordAddress保留差異供追溯。"
+}

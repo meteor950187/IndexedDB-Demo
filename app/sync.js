@@ -45,6 +45,7 @@ export async function syncOnce(
       bundle.routes,
       bundle.stops,
       bundle.routeStops,
+      bundle.stationGroups,
     ]);
     const hash = await crypto.subtle.digest(
       "SHA-256",
@@ -57,6 +58,7 @@ export async function syncOnce(
     const now = new Date().toISOString();
     const meta = {
       id: "current",
+      modelVersion: 2,
       version,
       checkedAt: now,
       savedAt: previous?.version === version ? previous.savedAt : now,
@@ -65,6 +67,7 @@ export async function syncOnce(
         routes: bundle.routes.length,
         stops: bundle.stops.length,
         routeStops: bundle.routeStops.length,
+        groups: bundle.stationGroups.filter((g) => g.kind === "station").length,
       },
       downloadedBytes,
     };

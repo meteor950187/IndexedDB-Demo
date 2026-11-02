@@ -1,20 +1,6 @@
-export const normalizeText = (value) =>
-  String(value ?? "")
-    .normalize("NFKC")
-    .toLowerCase()
-    .replaceAll("臺", "台")
-    .replace(/\s/g, "");
-
-export function tokens(value) {
-  const chars = [...normalizeText(value)];
-  return [
-    ...new Set(
-      chars.flatMap((c, i) =>
-        i + 1 < chars.length ? [c, c + chars[i + 1]] : [c],
-      ),
-    ),
-  ];
-}
+import { indexNames, stationText } from "./search.js";
+import { buildStationGroups } from "./groups.js";
+export { normalizeText, tokens } from "./search.js";
 
 function records(raw, label) {
   if (!raw || !Array.isArray(raw.BusInfo) || !raw.BusInfo.length)
@@ -107,20 +93,19 @@ export function normalizeBundle(raw) {
   }
   const routes = [...routeMap.values()].map((r) => ({
     ...r,
-    search: normalizeText([r.name, ...r.variants].join(" ")),
-    tokens: tokens([r.name, ...r.variants].join(" ")),
+    ...indexNames([r.name, ...r.variants]),
   }));
   const stops = [...stopMap.values()]
     .filter((s) => usedStops.has(s.id))
     .map((s) => ({
       ...s,
-      search: normalizeText([s.name, ...s.aliases].join(" ")),
-      tokens: tokens([s.name, ...s.aliases].join(" ")),
+      ...indexNames([s.name, ...s.aliases], stationText),
     }));
   return {
     routes,
     stops,
     routeStops,
+    stationGroups: buildStationGroups(stops),
     sourceTimes: Object.fromEntries(
       Object.entries(raw).map(([key, value]) => [
         key,

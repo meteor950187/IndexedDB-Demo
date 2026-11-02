@@ -1,4 +1,5 @@
 import { BusBridge } from "./bridge.js";
+import { validPosition } from "./groups.js";
 
 const $ = (id) => document.getElementById(id);
 const selected = { start: null, end: null };
@@ -99,13 +100,15 @@ function choose(which, stop) {
   $(which + "-list").hidden = true;
   $(which + "-selected").hidden = !stop;
   $(which + "-selected").textContent = stop
-    ? `✓ ${stop.address || "無地址資訊"} · 站位 ${stop.id}${stop.bearing ? " · " + stop.bearing : ""}`
+    ? `✓ ${stop.kind === "hub" ? "全部站區" : stop.area} · 自動比對 ${stop.stopIds.length} 個站位`
     : "";
   $("form-message").textContent = "";
 }
 function invalidate() {
   operation++;
   revisions.results++;
+  if ($("results").querySelector(".route-card"))
+    empty("選擇已變更", "選好起訖站後，重新按「尋找直達路線」。");
 }
 for (const which of ["start", "end"]) {
   let timer;
@@ -122,18 +125,29 @@ for (const which of ["start", "end"]) {
     timer = setTimeout(async () => {
       if (!text) return;
       try {
-        const rows = await bridge.query("searchStops", text);
-        if (version !== revisions[which]) return;
+        const response = await bridge.query("searchStations", text);
+        const rows = response.groups;
+        if (version !== revisions[which] || mode !== "stops") return;
         const items = rows.map((stop) => {
           const li = node("li");
-          const button = node("button", "candidate");
+          const button = node(
+            "button",
+            "candidate " +
+              (stop.kind === "hub"
+                ? "station-hub"
+                : stop.parentId
+                  ? "station-area"
+                  : ""),
+          );
           button.type = "button";
           button.append(
             node("strong", "", stop.name),
             node(
               "small",
               "",
-              `${stop.address || "無地址資訊"} · 站位 ${stop.id} ${stop.bearing || ""}`,
+              stop.kind === "hub"
+                ? `${stop.areas.join("、")} · 合併搜尋 ${stop.stopIds.length} 個站位`
+                : `${stop.area} · ${stop.stopIds.length} 個站位，自動選方向`,
             ),
           );
           button.addEventListener("click", () => {
@@ -143,7 +157,15 @@ for (const which of ["start", "end"]) {
           li.append(button);
           return li;
         });
-        if (rows.length === 60)
+        if (response.suggestion)
+          items.unshift(
+            node(
+              "li",
+              "candidate-message suggestion",
+              `找不到「${text}」。你可能要找「${response.suggestion}」：`,
+            ),
+          );
+        if (response.total > 60)
           items.push(
             node(
               "li",
@@ -155,7 +177,11 @@ for (const which of ["start", "end"]) {
           ...(items.length
             ? items
             : [
-                node("li", "candidate-message", "找不到站位，試試較短的站名。"),
+                node(
+                  "li",
+                  "candidate-message",
+                  "找不到站名，試試較短的名稱或道路站區。",
+                ),
               ]),
         );
       } catch (error) {
@@ -173,7 +199,10 @@ for (const which of ["start", "end"]) {
         .querySelector("button")
         ?.focus();
     }
-    if (event.key === "Escape") $(which + "-list").hidden = true;
+    if (event.key === "Escape") {
+      revisions[which]++;
+      $(which + "-list").hidden = true;
+    }
   });
   $(which + "-list").addEventListener("keydown", (event) => {
     const buttons = [...$(which + "-list").querySelectorAll("button")];
@@ -187,82 +216,183 @@ for (const which of ["start", "end"]) {
       (buttons[index - 1] || $(which + "-input")).focus();
     }
     if (event.key === "Escape") {
+      revisions[which]++;
       $(which + "-list").hidden = true;
       $(which + "-input").focus();
     }
   });
 }
 
+function locationCard(row, label) {
+  const block = node("div", "boarding-point");
+  block.dataset.stopId = row.stopId;
+  block.dataset.seq = row.seq;
+  const location = row.location || {};
+  block.append(
+    node("span", "boarding-label", label),
+    node("strong", "", row.name),
+  );
+  const directions = {
+    N: "北",
+    NE: "東北",
+    E: "東",
+    SE: "東南",
+    S: "南",
+    SW: "西南",
+    W: "西",
+    NW: "西北",
+  };
+  block.append(node("p", "", location.address || "官方未提供地址"));
+  if (directions[location.bearing])
+    block.append(node("small", "", `方向：${directions[location.bearing]}向`));
+  if (validPosition(location)) {
+    const link = node("a", "map-link", "Google 地圖定位 ↗");
+    link.href =
+      "https://www.google.com/maps/search/?api=1&query=" +
+      encodeURIComponent(`${location.lat},${location.lon}`);
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    block.append(link);
+  }
+  return block;
+}
 function routeCard(match) {
   const version = dataVersion;
-  const { route, direction, from, to } = match;
-  const details = node("details", "route-card");
-  const summary = node("summary");
+  const { route } = match;
+  let direction = match.direction;
+  let choice = match.options?.[0] || { from: match.from, to: match.to };
+  let rows;
+  let loadRevision = 0;
+  const card = node("article", "route-card");
+  card.dataset.routeId = route.id;
+  const header = node("div", "route-header");
   const info = node("div", "route-info");
   const title = node("strong");
-  title.append(
-    node("span", "direction-label", direction === "0" ? "去程" : "返程"),
-    document.createTextNode(
-      `往 ${direction === "0" ? route.destination : route.departure}`,
-    ),
+  const subtitle = node(
+    "small",
+    "",
+    `${route.departure} ↔ ${route.destination}`,
   );
-  info.append(
-    title,
-    node(
-      "small",
-      "",
-      from
-        ? `${from.name}${to ? " → " + to.name : " · 經過此站"} · 展開站序`
-        : `${route.departure} ↔ ${route.destination} · 展開站序`,
-    ),
-  );
+  info.append(title, subtitle);
+  const updateTitle = () =>
+    title.replaceChildren(
+      node("span", "direction-label", direction === "0" ? "去程" : "返程"),
+      document.createTextNode(
+        `往 ${direction === "0" ? route.destination : route.departure}`,
+      ),
+    );
+  updateTitle();
+  header.append(node("span", "route-number", route.name), info);
+  card.append(header);
+  const places = node("div", "boarding-places");
+  const details = node("details", "route-details");
+  const summary = node("summary");
   summary.append(
-    node("span", "route-number", route.name),
-    info,
+    document.createTextNode("查看完整站序"),
     node("span", "route-arrow", "›"),
   );
   const body = node("div", "route-body");
   details.append(summary, body);
-  let loaded = false;
-  details.addEventListener("toggle", async () => {
-    if (!details.open || loaded) return;
-    loaded = true;
+  function drawTimeline() {
+    const list = node("ol", "stop-timeline");
+    for (const row of rows) {
+      const board = choice.from?.id === row.id;
+      const alight = choice.to?.id === row.id;
+      const li = node("li", board ? "board" : alight ? "alight" : "");
+      li.append(node("span", "sequence", row.seq), node("span", "", row.name));
+      if (board || alight) li.append(node("em", "", board ? "上車" : "下車"));
+      list.append(li);
+    }
+    body.replaceChildren(
+      node(
+        "p",
+        "",
+        `${route.providers.join("、")} · ${rows.length} 個站牌${route.variants.length > 1 ? " · 官方另列服務：" + route.variants.join("、") : ""}`,
+      ),
+      list,
+    );
+    if (!rows.length)
+      body.append(node("p", "", "官方資料未提供這個方向的站序。"));
+  }
+  function drawPlaces() {
+    places.replaceChildren();
+    if (choice.from) places.append(locationCard(choice.from, "上車"));
+    if (choice.to) places.append(locationCard(choice.to, "下車"));
+    if (rows) drawTimeline();
+  }
+  if (match.options?.length > 1) {
+    const label = node(
+      "label",
+      "option-label",
+      `${match.options.length} 組可用${choice.to ? "上下車" : "上車"}位置`,
+    );
+    const select = node("select", "trip-options");
+    select.setAttribute(
+      "aria-label",
+      `${route.name}${direction === "0" ? "去程" : "返程"}的上下車位置`,
+    );
+    match.options.forEach((option, i) => {
+      const description = `${option.from.location?.address || option.from.name}${option.to ? " → " + (option.to.location?.address || option.to.name) : ""}`;
+      const item = node("option", "", description);
+      item.value = String(i);
+      select.append(item);
+    });
+    select.addEventListener("change", () => {
+      choice = match.options[Number(select.value)];
+      drawPlaces();
+    });
+    label.append(select);
+    card.append(label);
+  }
+  if (match.switchDirection) {
+    const select = node("select", "direction-select");
+    select.setAttribute("aria-label", `${route.name}的行駛方向`);
+    for (const d of ["0", "1"]) {
+      const option = node(
+        "option",
+        "",
+        `${d === "0" ? "去程" : "返程"} · 往 ${d === "0" ? route.destination : route.departure}`,
+      );
+      option.value = d;
+      select.append(option);
+    }
+    select.addEventListener("change", () => {
+      direction = select.value;
+      rows = null;
+      loadRevision++;
+      updateTitle();
+      if (details.open) loadTimeline();
+    });
+    card.append(select);
+  }
+  drawPlaces();
+  if (choice.from)
+    card.append(
+      places,
+      node("p", "map-note", "定位依官方站位座標；外部地圖需連線。"),
+    );
+  card.append(details);
+  async function loadTimeline() {
+    if (!details.open || rows) return;
+    const request = ++loadRevision;
     body.replaceChildren(node("p", "", "讀取站序…"));
     try {
-      const rows = await bridge.queryAtVersion(
+      const loaded = await bridge.queryAtVersion(
         version,
         "routeStops",
         route.id,
         direction,
       );
-      const list = node("ol", "stop-timeline");
-      rows.forEach((row) => {
-        const board = from && row.id === from.id;
-        const alight = to && row.id === to.id;
-        const li = node("li", board ? "board" : alight ? "alight" : "");
-        li.append(
-          node("span", "sequence", row.seq),
-          node("span", "", row.name),
-        );
-        if (board || alight) li.append(node("em", "", board ? "上車" : "下車"));
-        list.append(li);
-      });
-      body.replaceChildren(
-        node(
-          "p",
-          "",
-          `${route.providers.join("、")} · ${rows.length} 個站牌${route.variants.length > 1 ? " · 含支線：" + route.variants.join("、") : ""}`,
-        ),
-        list,
-      );
-      if (!rows.length)
-        body.append(node("p", "", "官方資料未提供這個方向的站序。"));
+      if (request !== loadRevision) return;
+      rows = loaded;
+      drawTimeline();
     } catch (error) {
-      loaded = false;
-      body.replaceChildren(node("p", "", error.message));
+      if (request === loadRevision)
+        body.replaceChildren(node("p", "", error.message));
     }
-  });
-  return details;
+  }
+  details.addEventListener("toggle", loadTimeline);
+  return card;
 }
 function renderMatches(matches, started, description) {
   $("query-time").textContent =
@@ -270,7 +400,7 @@ function renderMatches(matches, started, description) {
   if (!matches.length) {
     empty(
       "暫時找不到直達路線",
-      "試試同名的另一個站位，或交換起訖站。本 Demo 不提供轉乘規劃。",
+      "已檢查所選站群的所有站位，沒有符合方向與站序的直達路線。本 Demo 不提供轉乘規劃。",
     );
     return;
   }
@@ -278,7 +408,9 @@ function renderMatches(matches, started, description) {
     node(
       "p",
       "result-summary",
-      `${description} · 共 ${matches.length} 個路線方向`,
+      matches[0]?.switchDirection
+        ? description
+        : `${description} · 共 ${matches.length} 個路線方向`,
     ),
     ...matches.map(routeCard),
   );
@@ -288,21 +420,26 @@ async function searchTrips() {
   if ($("end-input").value.trim() && !selected.end)
     throw new Error("請從搜尋結果選擇迄站，或清空迄站欄位。");
   if (selected.start.id === selected.end?.id)
-    throw new Error("起站與迄站相同，請選擇不同站位。");
+    throw new Error("起站與迄站相同，請選擇不同站名或站區。");
   const version = ++revisions.results;
+  operation++;
   const started = performance.now();
   const start = selected.start;
   const end = selected.end;
   $("form-message").textContent = "";
-  const matches = end
-    ? await bridge.query("trips", start.id, end.id)
-    : await bridge.query("routesByStop", start.id);
-  if (version === revisions.results && mode === "stops")
-    renderMatches(
-      matches,
-      started,
-      end ? `${start.name} → ${end.name}` : `經過 ${start.name}`,
-    );
+  try {
+    const matches = end
+      ? await bridge.query("groupTrips", start.id, end.id)
+      : await bridge.query("groupRoutes", start.id);
+    if (version === revisions.results && mode === "stops")
+      renderMatches(
+        matches,
+        started,
+        end ? `${start.name} → ${end.name}` : `經過 ${start.name}`,
+      );
+  } catch (error) {
+    if (version === revisions.results && mode === "stops") showError(error);
+  }
 }
 $("trip-form").addEventListener("submit", (event) => {
   event.preventDefault();
@@ -336,8 +473,8 @@ $("example").addEventListener("click", async () => {
     );
     if (!from || !to) throw new Error("此路線資料不足，請手動選站。");
     const [start, end] = await Promise.all([
-      bridge.query("stop", from.stopId),
-      bridge.query("stop", to.stopId),
+      bridge.query("groupForStop", from.stopId),
+      bridge.query("groupForStop", to.stopId),
     ]);
     if (cancelled()) return;
     choose("start", start);
@@ -353,6 +490,10 @@ function setMode(value) {
   mode = value;
   revisions.results++;
   revisions.route++;
+  revisions.start++;
+  revisions.end++;
+  $("start-list").hidden = true;
+  $("end-list").hidden = true;
   for (const key of ["stops", "routes"]) {
     $("tab-" + key).setAttribute("aria-selected", String(key === value));
     $("tab-" + key).tabIndex = key === value ? 0 : -1;
@@ -362,7 +503,7 @@ function setMode(value) {
   empty(
     value === "stops" ? "先選一個起點" : "找一條熟悉的路線",
     value === "stops"
-      ? "選好站位，再按「尋找直達路線」。"
+      ? "選好站名或站區，再按「尋找直達路線」。"
       : "輸入路線名稱，查看去程與返程站序。",
   );
   if (value === "routes" && $("route-input").value)
@@ -405,9 +546,11 @@ $("route-input").addEventListener("input", () => {
         return;
       }
       renderMatches(
-        routes.flatMap((route) =>
-          ["0", "1"].map((direction) => ({ route, direction })),
-        ),
+        routes.map((route) => ({
+          route,
+          direction: "0",
+          switchDirection: true,
+        })),
         started,
         `${routes.length === 60 ? "前 " : ""}${routes.length} 條符合「${text}」的路線`,
       );

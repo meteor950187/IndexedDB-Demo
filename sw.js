@@ -1,4 +1,4 @@
-const CACHE = "taipei-bus-shell-v2";
+const CACHE = "taipei-bus-shell-v5";
 const FILES = [
   "./",
   "./index.html",
@@ -9,6 +9,8 @@ const FILES = [
   "./app/config.js",
   "./app/db.js",
   "./app/model.js",
+  "./app/search.js",
+  "./app/groups.js",
   "./app/sync.js",
   "./app/worker.js",
 ];
@@ -16,22 +18,31 @@ const shellUrls = new Set(
   FILES.map((file) => new URL(file, self.registration.scope).href),
 );
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(FILES)));
+  event.waitUntil(
+    caches
+      .open(CACHE)
+      .then((cache) => cache.addAll(FILES))
+      .then(() => self.skipWaiting()),
+  );
 });
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches
-      .keys()
-      .then((keys) =>
-        Promise.all(
-          keys
-            .filter(
-              (key) => key.startsWith("taipei-bus-shell-") && key !== CACHE,
-            )
-            .map((key) => caches.delete(key)),
-        ),
-      )
-      .then(() => self.clients.claim()),
+    (async () => {
+      const old = (await caches.keys()).filter(
+        (key) => key.startsWith("taipei-bus-shell-") && key !== CACHE,
+      );
+      await self.clients.claim();
+      if (old.length) {
+        // 舊版頁面沒有更新監聽器；新殼層完整安裝後一次重載，避免仍使用舊選站程式。
+        const clients = await self.clients.matchAll({ type: "window" });
+        // 不等待 navigation 完成：導覽的 fetch 會等待 activate 結束，等待彼此將造成死鎖。
+        for (const client of clients.filter((client) =>
+          client.url.startsWith(self.registration.scope),
+        ))
+          client.navigate(client.url).catch(() => {});
+      }
+      await Promise.all(old.map((key) => caches.delete(key)));
+    })(),
   );
 });
 self.addEventListener("fetch", (event) => {
