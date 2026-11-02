@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#14574c" />
+    <meta
+      name="description"
+      content="台北公車直達路線與站序查詢。官方資料背景同步，下載一次，離線也能找下一站。"
+    />
+    <title>下一站台北｜公車離線查詢</title>
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./app/style.css" />
+    <script type="module" src="./app/ui.js"></script>
+  </head>
+  <body>
+    <a class="skip" href="#planner">跳到查詢</a>
+    <header class="site-header wrap">
+      <a href="./" class="brand" aria-label="下一站台北首頁"
+        ><span class="brand-icon" aria-hidden="true">↗</span
+        ><span>下一站台北<small>TAIPEI BUS / LOCAL FIRST</small></span></a
+      >
+      <div class="network">
+        <span id="network-dot" class="dot"></span
+        ><span id="network-label">連線中</span>
+      </div>
+    </header>
+    <main class="wrap">
+      <section class="hero" aria-labelledby="hero-title">
+        <div>
+          <p class="eyebrow">把路線留在身邊</p>
+          <h1 id="hero-title">出發，<br />下一站<span>台北。</span></h1>
+          <p class="hero-copy">
+            找到兩站之間的直達公車。<br />資料下載一次，沒網路也能慢慢查。
+          </p>
+        </div>
+        <div class="route-art" aria-hidden="true">
+          <span class="art-tag">城市裡的每一段日常</span
+          ><svg viewBox="0 0 420 215" fill="none">
+            <path
+              d="M20 175H130Q155 175 155 150V70Q155 45 180 45H380"
+              stroke="#dedbcf"
+              stroke-width="14"
+            />
+            <path
+              d="M20 175H130Q155 175 155 150V70Q155 45 180 45H380"
+              stroke="#14574c"
+              stroke-width="4"
+              stroke-dasharray="7 7"
+            />
+            <circle
+              cx="65"
+              cy="175"
+              r="13"
+              fill="#f7f6f0"
+              stroke="#14574c"
+              stroke-width="5"
+            />
+            <circle cx="155" cy="105" r="9" fill="#14574c" />
+            <circle cx="325" cy="45" r="16" fill="#d1663d" />
+            <circle cx="325" cy="45" r="6" fill="#fff" />
+            <text x="36" y="140" fill="#14574c" font-size="15">從這裡</text>
+            <text x="294" y="94" fill="#14574c" font-size="15">
+              到那裡
+            </text></svg
+          ><span class="art-caption">你的路線，在你的裝置裡。</span>
+        </div>
+      </section>
+
+      <div class="workspace">
+        <section
+          id="planner"
+          class="planner panel"
+          aria-labelledby="planner-title"
+        >
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">01 / 找一段路</p>
+              <h2 id="planner-title">今天想去哪裡？</h2>
+            </div>
+            <span class="small-tag">台北聯營公車</span>
+          </div>
+          <div class="tabs" role="tablist" aria-label="查詢方式">
+            <button
+              id="tab-stops"
+              role="tab"
+              aria-selected="true"
+              aria-controls="stops-pane"
+            >
+              起訖站查詢
+            </button>
+            <button
+              id="tab-routes"
+              role="tab"
+              aria-selected="false"
+              aria-controls="routes-pane"
+              tabindex="-1"
+            >
+              搜尋路線
+            </button>
+          </div>
+          <form id="trip-form">
+            <div id="stops-pane" role="tabpanel" aria-labelledby="tab-stops">
+              <div class="stop-fields">
+                <div class="field">
+                  <label for="start-input"
+                    ><span class="stop-dot"></span>從哪裡出發
+                    <span class="required">必選</span></label
+                  ><input
+                    id="start-input"
+                    type="search"
+                    placeholder="輸入站名，例如：台北車站"
+                    autocomplete="off"
+                    maxlength="80"
+                    disabled
+                    aria-describedby="start-help"
+                  />
+                  <p id="start-help" class="field-help">
+                    輸入後，請從下方選擇確切站位。
+                  </p>
+                  <ul
+                    id="start-list"
+                    class="candidates"
+                    aria-label="起站搜尋結果"
+                    hidden
+                  ></ul>
+                  <div id="start-selected" class="selection" hidden></div>
+                </div>
+                <button
+                  type="button"
+                  id="swap"
+                  class="swap"
+                  aria-label="交換起站與迄站"
+                  disabled
+                >
+                  ⇅
+                </button>
+                <div class="field">
+                  <label for="end-input"
+                    ><span class="stop-dot destination"></span>想在哪裡下車
+                    <span class="optional">選填</span></label
+                  ><input
+                    id="end-input"
+                    type="search"
+                    placeholder="輸入目的地站名"
+                    autocomplete="off"
+                    maxlength="80"
+                    disabled
+                    aria-describedby="end-help"
+                  />
+                  <p id="end-help" class="field-help">
+                    不選迄站，可查看起站經過的所有路線。
+                  </p>
+                  <ul
+                    id="end-list"
+                    class="candidates"
+                    aria-label="迄站搜尋結果"
+                    hidden
+                  ></ul>
+                  <div id="end-selected" class="selection" hidden></div>
+                </div>
+              </div>
+              <div class="form-actions">
+                <button id="search-trips" class="primary" disabled>
+                  尋找直達路線 <span aria-hidden="true">↗</span></button
+                ><button id="reset" type="button" class="quiet">清除</button>
+              </div>
+              <p class="try-line">
+                還沒想好？
+                <button id="example" type="button" disabled>
+                  試試一段 307 路線
+                </button>
+              </p>
+            </div>
+            <div
+              id="routes-pane"
+              role="tabpanel"
+              aria-labelledby="tab-routes"
+              hidden
+            >
+              <label for="route-input">公車路線名稱</label
+              ><input
+                id="route-input"
+                type="search"
+                placeholder="例如：307、藍、幹線"
+                autocomplete="off"
+                maxlength="80"
+                disabled
+              />
+              <p class="field-help">
+                輸入路線名稱，即可查看去程、返程與沿途站序。
+              </p>
+            </div>
+          </form>
+          <p
+            id="form-message"
+            class="form-message"
+            role="status"
+            aria-live="polite"
+          ></p>
+        </section>
+
+        <aside class="data-panel panel" aria-labelledby="data-title">
+          <div class="section-heading">
+            <p class="eyebrow">02 / 隨身資料</p>
+            <span class="database-icon" aria-hidden="true">▤</span>
+          </div>
+          <h2 id="data-title">城市資料，<br />準備好了嗎？</h2>
+          <div id="sync-status" class="sync-status" role="status">
+            <span class="pulse"></span
+            ><span id="status-text">正在開啟本機資料庫…</span>
+          </div>
+          <p id="sync-detail" class="sync-detail">
+            首次使用需下載官方資料；完成後即可離線查詢。
+          </p>
+          <div class="stats">
+            <div><strong id="route-count">—</strong><span>條主路線</span></div>
+            <div><strong id="stop-count">—</strong><span>個可查站位</span></div>
+          </div>
+          <dl class="meta">
+            <div>
+              <dt>資料儲存</dt>
+              <dd id="saved-at">尚未下載</dd>
+            </div>
+            <div>
+              <dt>最近檢查</dt>
+              <dd id="checked-at">—</dd>
+            </div>
+            <div>
+              <dt>離線頁面</dt>
+              <dd id="shell-status">準備中</dd>
+            </div>
+          </dl>
+          <button id="sync-now" class="secondary">
+            立即檢查更新 <span aria-hidden="true">↻</span>
+          </button>
+          <details class="sync-log">
+            <summary>同步紀錄與資料來源</summary>
+            <ol id="event-log"></ol>
+            <p>
+              資料：臺北市公共運輸處。<a
+                href="https://data.taipei/dataset/detail?id=6a03b03d-90d1-4d9e-a952-c940fd869772"
+                target="_blank"
+                rel="noreferrer"
+                >查看官方資料集 ↗</a
+              >
+            </p>
+            <p id="source-time"></p>
+            <p>HTTP 快取遵循來源伺服器設定；此畫面不代表 CDN 命中。</p>
+          </details>
+        </aside>
+      </div>
+
+      <section class="results-section" aria-labelledby="results-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">03 / 你的下一站</p>
+            <h2 id="results-title">查詢結果</h2>
+          </div>
+          <span id="query-time" class="query-time"></span>
+        </div>
+        <div id="results" aria-live="polite">
+          <div class="empty">
+            <span aria-hidden="true">↗</span>
+            <h3>先選一個起點</h3>
+            <p>從站名開始，找到經過你的那班公車。</p>
+          </div>
+        </div>
+      </section>
+      <section class="how-it-works" aria-label="使用說明">
+        <div>
+          <span>01</span>
+          <h3>先下載，再出發</h3>
+          <p>背景更新官方路線與站牌資料。</p>
+        </div>
+        <div>
+          <span>02</span>
+          <h3>查詢就在本機</h3>
+          <p>站名與路線搜尋不需逐次呼叫遠端服務。</p>
+        </div>
+        <div>
+          <span>03</span>
+          <h3>沒網路，也有方向</h3>
+          <p>同步成功後，可使用保留的資料繼續查詢。</p>
+        </div>
+      </section>
+    </main>
+    <footer class="wrap">
+      <span
+        >下一站台北 <span class="footer-separator">/</span> 離線公車查詢
+        Demo</span
+      >
+      <p>
+        提供路線與站序參考，非即時到站預報。臨時改道與營運資訊請以官方公告為準。
+      </p>
+    </footer>
+    <noscript
+      >此查詢需要開啟 JavaScript，才能使用 IndexedDB 與背景同步。</noscript
+    >
+  </body>
+</html>
