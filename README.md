@@ -1,129 +1,155 @@
-# 下一站台北 · 公車離線查詢
+# 下一站台北｜IndexedDB × Web Worker 公車查詢 Demo
 
-從原始 Bridge / Worker / IndexedDB 設計重新製作的原生 JavaScript Demo。提供站名搜尋、路線搜尋、站點經過路線、去返程站序與兩站直達路線查詢。
+本專案將過去專案中 **IndexedDB 與 Web Worker 的使用經驗提取出來，重新整理資料來源、資料處理流程與呈現方式**，以臺北聯營公車開放資料作為新的應用情境。
 
-## 啟動
+延續的核心做法，是由 Worker 在背景同步資料，將整理後的內容儲存在瀏覽器的 IndexedDB，再由前端直接查詢本機資料。本次以公車路線、站位與站序重新設計資料模型，並加入站群選擇、直達路線查詢及快取資料檢視，讓原本藏在程式內部的資料處理流程，可以透過實際操作呈現。
 
-需要 Node.js 22 以上。執行應用程式不需安裝套件：
+這是一個用於作品集與面試展示的原生 JavaScript 專案，重點在於 **瀏覽器端的資料管理、背景同步、索引查詢，以及離線使用的完整流程**。
 
-```powershell
+## 專案可以展示什麼？
+
+| 展示面向 | 實際功能 |
+|---|---|
+| 資料取得與整理 | 下載官方 gzip JSON，由 Worker 解壓、驗證、正規化，再寫入 IndexedDB |
+| 本機資料查詢 | 透過 IndexedDB 索引搜尋站名與路線，並依路線、方向及站序配對直達行程 |
+| 資料模型與使用體驗 | 將附近同名站位整理為站群，使用者選站名後，由程式找出適合的上下車站位 |
+| 離線與更新處理 | 已儲存資料可先供查詢；背景更新失敗時保留前版，頁面也能在完成快取後離線重新開啟 |
+| 可觀察的儲存內容 | 從「查看快取資料」開啟視窗，直接瀏覽資料表、實際筆數、索引與完整 JSON |
+
+### 查看 IndexedDB 裡的資料
+
+頁首的「查看快取資料」可切換五張資料表，分頁瀏覽資料並展開單筆 JSON。筆數透過 object store 的 `count()` 取得，主鍵與索引資訊則讀自資料庫 schema；畫面呈現的是當下瀏覽器實際儲存的內容。
+
+這個介面讓展示者可以從一筆路線資料，接著說明它的搜尋 token、索引與本機查詢方式，也能直接對照同步時間及資料版本。
+
+![IndexedDB 快取資料檢視：資料表筆數、索引與實際路線內容](docs/images/cache-inspector.png)
+
+<details>
+<summary>查看公車查詢畫面</summary>
+
+![智光商職至臺北車站忠孝的直達路線與上下車位置](docs/images/bus-query.png)
+
+</details>
+
+## 技術設計
+
+使用 HTML、CSS 與原生 JavaScript ES Modules，搭配 IndexedDB、Web Worker、Service Worker、Web Locks 與 BroadcastChannel。應用程式直接讀取公開資料檔，本機 Node.js server 負責提供靜態檔案。
+
+```mermaid
+flowchart LR
+    UI[查詢介面] --> Bridge[BusBridge]
+    Bridge -->|唯讀查詢| DB[(IndexedDB)]
+    Bridge -->|初始化／要求同步| Worker[Web Worker]
+    Source[官方 gzip JSON] -->|背景下載| Worker
+    Worker -->|驗證、正規化、原子寫入| DB
+    Worker -->|狀態與版本通知| Bridge
+```
+
+### 1. Web Worker：背景同步與資料整理
+
+Worker 負責下載三份官方資料、處理解壓縮與欄位正規化，並計算內容的 SHA-256 摘要。若資料內容沒有改變，只更新檢查時間；有變更時，才以單一 transaction 替換整批資料。
+
+有既有快取時，介面可先開放查詢，再進行背景同步。同步支援下載逾時、失敗退避重試與定期檢查；同一分頁的重複同步要求會合併，支援 Web Locks 的瀏覽器也會協調跨分頁同步。
+
+### 2. IndexedDB：資料模型、索引與一致性
+
+資料以五個 object store 儲存：
+
+| Object store | 儲存內容 | 索引 |
+|---|---|---|
+| `routes` | 主路線名稱、起終點、業者、支線／別名 | `tokens`，multiEntry |
+| `stops` | 實體站位名稱、地址、經緯度、方位 | `tokens`，multiEntry |
+| `routeStops` | 路線與站位關聯、去返程、停靠順序 | `stop`；`routeDirection` 複合索引 |
+| `stationGroups` | 站群及其成員、道路站區階層 | `tokens`、`stop`，皆為 multiEntry |
+| `meta` | 資料版本、來源時間、同步時間與筆數 | 以主鍵 `current` 直接讀取 |
+
+名稱搜尋會先以單字／相鄰兩字組成的 token 索引縮小候選範圍，再做完整比對與排序。每個名稱及別名獨立比對；純數字需符合完整數字段，因此搜尋 `262` 可找到 `262`、`262區`，不會因字串拼接而誤命中 `26` 或 `226`。
+
+直達查詢透過站位索引取得相關路線，再檢查「相同路線、相同方向、上車站序早於下車站序」。一次查詢所需資料在同一個唯讀 transaction 中取得，展開站序時也會比對資料版本。背景更新以原子交易提交，避免新舊資料混用；schema 升級則能由既有快取建立站群，不必刪除資料庫重新下載。
+
+### 3. BusBridge：介面與同步生命週期的入口
+
+Bridge 封裝 Worker 的初始化、訊息往返、同步狀態與查詢入口。介面透過 Bridge 讀取 IndexedDB；下載與資料整理則交給 Worker 執行。
+
+跨分頁資料更新透過 BroadcastChannel 通知，介面會讓舊結果失效。快速輸入、交換起訖或切換查詢模式時，也以操作版本避免較晚回傳的舊結果覆蓋新選擇。
+
+### 4. HTTP 快取、IndexedDB 與離線頁面的分工
+
+| 機制 | 在本專案的用途 |
+|---|---|
+| HTTP 快取 | 下載使用 `cache: 'default'`，由瀏覽器依來源 HTTP headers 決定是否使用快取 |
+| IndexedDB | 儲存整理後的公車資料，供索引搜尋與行程配對使用 |
+| Service Worker ＋ Cache Storage | 保存 HTML、CSS、JavaScript 等頁面檔案，支援離線重新開啟 |
+
+「資料可離線查詢」與「頁面可離線開啟」分別由 IndexedDB 與 Service Worker 配合完成。資料檔與頁面檔案各有其更新流程；HTTP／CDN 快取成效則取決於來源與部署設定，本專案沒有量測 CDN 命中率。
+
+## 從資料模型到操作體驗
+
+同一個站名可能有多個實體站位，且去返程停靠的位置不同。例如智光商職與臺北車站忠孝，都不能只用一個固定站位代表使用者的起訖需求。
+
+本專案將附近同名站位整理為站群，保留忠孝、公園等道路站區，也提供明確標示的「全部站區」選項。選定起訖後，程式自動比對群內站位，顯示實際上下車地址、方向與 Google Maps 座標連結；交換起訖時重新評估有效組合。
+
+分組採保守的距離界限：同名站群所有成員兩兩直線距離不超過 400 公尺，上層站區不超過 900 公尺。每條路線、每個方向整理為一張結果卡，並保留可用的替代上下車位置。
+
+## 資料來源
+
+資料由臺北市公共運輸處提供，使用[臺北市資料大平臺的公車資料集](https://data.taipei/dataset/detail?id=6a03b03d-90d1-4d9e-a952-c940fd869772)：
+
+| 檔案 | 用途 |
+|---|---|
+| [GetRoute.gz](https://tcgbusfs.blob.core.windows.net/blobbus/GetRoute.gz) | 路線、業者及路徑名稱 |
+| [GetStop.gz](https://tcgbusfs.blob.core.windows.net/blobbus/GetStop.gz) | 路線與站位關聯、方向及站序 |
+| [GetStopLocation.gz](https://tcgbusfs.blob.core.windows.net/blobbus/GetStopLocation.gz) | 實體站位名稱、地址及座標 |
+
+三份檔案皆為 gzip 壓縮的 JSON，採全量下載後整理成查詢模型；只保留本專案需要的欄位及有路線關聯的站位。資料範圍依這組官方來源，並非全臺灣所有公車。
+
+2026-11-03 驗證快照整理後有 **416 條主路線、5,376 個實體站位、28,826 筆路線站序**；實際筆數會隨官方更新而改變。來源時間與智光商職行程的逐筆對照見 [資料驗證紀錄](docs/verification.md)。
+
+## 本機執行
+
+需要 **Node.js 22 以上**。應用程式沒有前端建置步驟，啟動靜態 server 即可：
+
+```bash
 npm start
 ```
 
-開啟 <http://127.0.0.1:4173>。請使用新版 Chrome、Edge、Firefox 或 Safari；不要直接以 `file://` 開啟 HTML。其他 port：`$env:PORT=4174; npm start`。
+開啟 [http://127.0.0.1:4173](http://127.0.0.1:4173)。首次使用需連線下載官方資料；請透過 localhost 開啟，不使用 `file://`。
 
-測試才需要安裝開發依賴：
+### 建議展示流程
 
-```powershell
+1. 等待資料載入，點「查看快取資料」，說明五張資料表、索引與單筆 JSON。
+2. 查詢「智光商職 → 臺北車站(忠孝)」，查看直達路線與實際上下車位置；本次驗證資料可查到 262、262區。
+3. 交換起訖站再查詢，觀察反向使用不同站位；展開卡片查看完整站序。
+4. 切換到路線搜尋，輸入 `262`，展示完全相符優先及支線區分。
+5. 確認「離線頁面」顯示已保存，在瀏覽器 DevTools 切換 Offline 後重新整理，展示本機查詢與快取內容。
+
+## 測試與驗證
+
+```bash
 npm ci
 npm test
 ```
 
-瀏覽器驗收使用 Playwright CLI（先啟動 server，另開終端機執行）：
+目前有 **15 個自動測試通過**，涵蓋名稱匹配、站群與方向配對、索引與快取檢視、資料庫遷移、原子寫入及失敗保留資料。
 
-```powershell
-npx --yes --package @playwright/cli playwright-cli -s=bus-review open http://127.0.0.1:4173
-npx --yes --package @playwright/cli playwright-cli -s=bus-review run-code --filename=tests/browser-acceptance.js
-npx --yes --package @playwright/cli playwright-cli -s=bus-review run-code --filename=tests/browser-stations.js
-npx --yes --package @playwright/cli playwright-cli -s=bus-review run-code --filename=tests/browser-races.js
-npx --yes --package @playwright/cli playwright-cli -s=bus-review close
-```
+另以真實瀏覽器驗證正反向行程、快速操作、桌面與手機畫面、同步失敗恢復、跨分頁更新及舊版升級後的離線查詢。測試範圍與證據見 [驗證紀錄](docs/verification.md)；重跑瀏覽器腳本及部署方式見 [開發與驗收指南](docs/development.md)。
 
-這些驗收腳本會建立獨立瀏覽器 context，使用官方資料，並在其中模擬斷線與跨分頁換版，不修改你的日常瀏覽器資料。需要可用的 Chromium；截圖在 `output/playwright/`（不納入 Git）。站位斷言依本次官方快照，日後資料異動時請重新核對證據。詳細實測及舊版升級驗收方式見 [驗證紀錄](docs/verification.md)。
+## 程式碼導覽
 
-## 建議 review 順序
-
-1. 等待右側顯示主路線及站位數量；首次需下載官方資料。
-2. 起站輸入「志光商職」，閱讀提示並選「智光商職」；4 個附近站位只需選一次。
-3. 迄站輸入「台北車站」，可選「全部站區」或忠孝、公園等站區。選「臺北車站(忠孝)」後查詢：本次資料有 262、262區，直接顯示實際上下車位置、地址與 Google Maps 定位連結。
-4. 按交換起訖站再查詢，檢查反向上下車位置不同；展開完整站序確認標記。清除迄站可查起站經過路線。也可試「捷運公館站 → 臺北車站(忠孝)」或 307 範例。
-5. 切到「搜尋路線」，輸入 `262`：只出現 262、262區；輸入 `26`、`226` 時完全相符路線排在前面。卡片可切換去返程。
-6. 等待「離線頁面」顯示已保存，用 DevTools Network → Offline，重新整理，繼續搜尋與展開站序。
-7. 恢復 Online，按「立即檢查更新」。同步中可查詢；失敗時保留既有快取。
-
-不同 origin（例如 localhost / 127.0.0.1 / 不同 port）有各自獨立快取。清除網站資料會移除 IndexedDB 與離線頁面。無痕模式或瀏覽器空間回收也可能使快取消失。
-
-## 展示 IndexedDB 快取
-
-頁首「網路已連線」旁的「查看快取資料」會開啟本機資料檢視視窗。可切換路線、實體站位、路線站序、站群及同步資訊五張資料表，查看實際筆數、主鍵、索引與每筆完整 JSON。資料每頁讀取 20 筆，依主鍵排序；站群筆數包含「全部站區」的上層群組。
-
-筆數使用 object store 的 `count()`，索引資訊讀自 IndexedDB schema，沒有寫死展示數字。檢視透過 Bridge 的唯讀入口，在同一個 transaction 讀取各表筆數、同步資訊及當頁資料；翻頁途中若資料版本已變更，會提示重新讀取。尚未下載時也能查看空資料庫。
-
-「重新讀取」只更新本機展示，不觸發官方資料下載；介面模組已加入 Service Worker 離線殼層。點關閉或按 Escape 可回到原查詢，起訖站與路線結果不因開關視窗而清除。
-
-## 架構
-
-```text
-HTML / UI ──查詢──▶ BusBridge ──readonly transaction──▶ IndexedDB
-                       │                                    ▲
-                       └── Init / Sync ──▶ Web Worker ────────┘
-                                          │        atomic replace
-                              官方 gzip JSON → 驗證/正規化/SHA-256
-
-Service Worker ── Cache Storage ── 應用程式殼層（HTML / CSS / JS）
-```
-
-- `GameCodeBridge.js`、`workerByJson.js`、`workerSiteSetting.js`：原始版本完整保留，Demo 不載入它們。
-- `app/bridge.js`：Worker 生命週期、InitPromise、ready/status/syncerror 事件、查詢入口。
-- `app/worker.js`：Init → Sync → InitSyncEnd；定期更新、錯誤重試、單分頁合併要求及跨分頁 Web Locks。
-- `app/sync.js`：HTTP 下載、gzip 解壓、驗證、內容摘要、整批儲存。
-- `app/model.js`：官方欄位轉換、方向與站序資料。
-- `app/search.js`：逐名稱搜尋、正規化、完整數字段及結果排序。
-- `app/groups.js`：附近同名站群、道路站區與全部站區階層。
-- `app/db.js`：資料庫 schema、索引與一致性查詢。
-- `app/config.js`：資料來源、資料庫名稱、1 小時同步間隔、30 秒下載逾時、15 秒至 5 分鐘退避重試。
-- `app/ui.js`、`app/style.css`：繁體中文響應式介面。
-- `sw.js`：只快取應用程式殼層，不代理或重複保存官方資料檔。
-- `tools/serve.js`：只開放應用程式檔案的 localhost 靜態 server，沒有 proxy 或後端 API。
-
-## 資料來源與格式
-
-官方：[臺北市資料大平臺](https://data.taipei/dataset/detail?id=6a03b03d-90d1-4d9e-a952-c940fd869772)，提供機關為臺北市公共運輸處。
-
-| 用途 | 檔案 |
+| 檔案 | 職責 |
 |---|---|
-| 路線 | [GetRoute.gz](https://tcgbusfs.blob.core.windows.net/blobbus/GetRoute.gz) |
-| 站牌、路線關聯、站序 | [GetStop.gz](https://tcgbusfs.blob.core.windows.net/blobbus/GetStop.gz) |
-| 站位名稱與座標 | [GetStopLocation.gz](https://tcgbusfs.blob.core.windows.net/blobbus/GetStopLocation.gz) |
+| `app/bridge.js` | Worker 生命週期、訊息協調與查詢入口 |
+| `app/worker.js`、`app/sync.js` | 背景同步、重試、解壓驗證與整批更新 |
+| `app/db.js` | schema、索引、遷移與交易查詢 |
+| `app/model.js`、`app/groups.js`、`app/search.js` | 官方資料轉換、站群與搜尋規則 |
+| `app/ui.js`、`app/cache-viewer.js` | 查詢介面與 IndexedDB 展示視窗 |
+| `sw.js` | 頁面檔案快取與版本更新 |
+| `tests/` | 資料層回歸測試與瀏覽器驗收腳本 |
 
-解壓後為 `{ EssentialInfo: { UpdateTime, ... }, BusInfo: [...] }`。使用 magic bytes 判斷是否還需 gzip 解壓，兼容伺服器透過 Content-Encoding 自動解壓的情況。不使用 `Tst*.json` 範例檔。
+原始 `GameCodeBridge.js`、`workerByJson.js`、`workerSiteSetting.js` 保留在儲存庫中，作為本次提取與重新整理的起點；目前 Demo 的執行入口位於 `app/`。
 
-GetRoute 的 Id 可能因業者或支線重複；GetStop.routeId 對應 Id，並非 pathAttributeId。正規化依主路線合併業者與支線名稱。只列出有站牌關聯的站位；獨立站位檔缺少某筆時，可由站牌記錄的名稱與座標補足。
+## 專案範圍
 
-不同主路線 Id 的服務分開呈現，例如 262 與 262區。相同 Id 的多個業者／路徑名稱保留為別名，無法據此保證每個班次行經所有站牌。資料為路線與站序參考，不含即時到站、班次是否營運、即時改道及轉乘規劃。名稱明示「裁撤／不停靠／停用／暫停服務／暫停使用／已取消」的站位不作為候選或推薦上下車點；原始站序仍保留標示。未標示的停駛無法由此偵測。
+本作品提供路線與站序查詢，不包含即時到站、即時車輛位置、完整班次時刻表、票價或轉乘規劃。站群採直線距離分組，地圖連結提供定位，不代表已計算步行路徑。
 
-## 選站與搜尋規則
-
-- 同完整站名（台／臺、全半形、空白及括號格式正規化）且所有成員兩兩直線距離不超過 400 公尺，組成一個站群。遙遠同名站及無有效座標站保守分開，不透過連續近鄰無限合併。
-- 括號內道路／站區名稱保留。同基本站名的不同站區、所有站位直徑不超過 900 公尺時，另提供明示「全部站區」的上層選項。臺北車站有全部站區與 7 個分區，忠孝的 7 個站位合併選取。
-- 站群不預先固定方向。查詢時自動比對成員，僅接受同路線、同方向、上車站序早於下車站序。交換起訖後重新配對；每路線＋方向一張卡，多組有效位置可用下拉選單切換。相同實體站位組合的循環行經僅保留站序差最小的一段。
-- 每個路線名稱／別名獨立比對，絕不串接匹配。純數字需符合完整數字段（262 不匹配 26／226／1262），文字可部分搜尋；主名稱完全相符、別名完全相符、名稱前綴、其他包含依序排列。
-- 「志光商職」不是本次官方站名。無直接命中時明示可能要找「智光商職」，由使用者選取，不生成虛構站名。
-- 地圖連結使用官方座標，不需要 API Key；400／900 公尺是分組的直線距離上限，不代表步行距離、可通行路徑或無障礙承諾。卡片的主要組合依站序差選取，不是最快行程推薦。
-
-## 同步與快取
-
-1. 有快取時立刻發出 ready，UI 可查詢，再背景同步。
-2. 三份資料下載並驗證後，在同一個 readwrite transaction 更新 routes / stops / routeStops / stationGroups / meta。任一失敗都不會清掉舊資料。
-3. 正規化內容 SHA-256 不變時只更新檢查時間，不重寫資料 stores。
-4. 原始範例的分頁／時間戳增量協定不適用這組全量檔；此版本使用全量快照替換。
-5. fetch 使用 `cache: 'default'`，沒有附加時間戳或 `no-store`；由瀏覽器與來源 HTTP headers 管理 HTTP 快取。下載可能來自瀏覽器快取，「最近檢查」不是保證向源站確認最新版本，也不代表 CDN 命中。
-6. IndexedDB 是本機查詢資料，Cache Storage 是離線頁面，兩者職責不同。沒有自行建置 CDN，也不假稱已測得 CDN 命中率。
-
-資料庫名稱維持 `TaipeiBusOffline-v1`，schema version 為 2。升級在 versionchange transaction 內從既有資料建立 stationGroups、重建逐名稱索引與 metadata，不需重新下載，也保留原始 savedAt。`routes` / `stops` / `stationGroups` 有 multiEntry token 索引；站群另有成員索引；`routeStops` 有 stopId 與 [routeId, direction] 索引；`meta` 存已提交版本與來源時間。查詢先索引縮小範圍，再套用上述匹配與排序規則，最多顯示 60 筆並提示縮小範圍。
-
-直達路線要求相同 routeId、相同 direction、起站 seq < 迄站 seq。循環重複站位選擇最近的有效順向區間，同站不算行程。每次查詢在單一 readonly transaction 讀取，避免背景提交期間混用兩代資料。
-
-跨分頁以 BroadcastChannel 通知已提交的新版本；畫面清除舊結果，站序查詢另在同一 transaction 比對預期版本，防止通知尚未抵達時混用舊卡片與新站序。輸入、選站、清除或切換查詢模式，會取消先前尚未完成的範例／查詢結果。
-
-## 靜態部署與更新
-
-只需託管 `index.html`、`icon.svg`、`sw.js`、`app/`，支援子目錄，相對路徑不綁死根目錄。部署須用 HTTPS；目前交付在本機，沒有替你建立或發布任何遠端服務。
-
-修改殼層檔案後，同步提高 `sw.js` 的 CACHE 版本。新 Service Worker 完整安裝後啟用新殼層，更新有舊快取的同範圍分頁並移除舊殼層，因此升級時可能重新整理並清除尚未提交的選站內容。資料庫會保留並遷移，不需要使用者刪除快取或 Unregister。完全離線時仍使用已安裝版本，待連線取得新殼層後更新。不要在正式站點同一路徑混用其他 Service Worker。
-
-## 履歷敘述參考
-
-> 以 Web Worker 在背景下載並正規化公開 JSON 資料，透過 IndexedDB 原子交易與索引提供本機路線查詢；搭配 HTTP 快取相容請求與 Service Worker 殼層快取，實現離線重新開啟、同步失敗保留資料及重試機制。
-
-CDN 靜態資料分發可作為此架構的延伸說明；本 Demo 未自行部署 CDN，因此不列為已完成的量化成果。
+官方檔案各自更新，地址或營運標示可能存在差異；本機交易可保證整批提交的一致性，無法補足來源未提供的即時狀態。離線資料保留也受到瀏覽器儲存空間與使用者清除網站資料的影響。實際瀏覽器驗證以 Chromium 為主。

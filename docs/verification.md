@@ -8,7 +8,7 @@
 
 本次頁面由 shell-v5 自動升級至 shell-v6；新檢視模組列入殼層快取。空資料與版本衝突以資料層測試驗證，本次未另外模擬瀏覽器完全斷網。
 
-截圖：[快取檢視視窗](../output/playwright/cache-inspector-desktop.png)。
+截圖：[快取檢視視窗](images/cache-inspector.png)。
 
 日期：2026-11-03（Asia/Taipei）。環境：Windows、Node.js v24.15.0、Playwright CLI Chromium。基準為 `907a54d`，本次修正站群、逐名稱搜尋及既有資料升級。
 
@@ -72,7 +72,7 @@ node tools/verify-official.js
 | 清除路線、延遲查詢失敗後重設 | 舊卡片與過時錯誤不殘留 |
 | 一般使用流程 pageerror | 0 |
 
-上述三份腳本執行方式見 README。程式使用實際 browser context，除失敗／競態注入情境外，直接下載並查詢官方資料。
+上述三份腳本執行方式見 [開發與驗收指南](development.md)。程式使用實際 browser context，除失敗／競態注入情境外，直接下載並查詢官方資料。
 
 ## 真正舊版升級
 
@@ -112,9 +112,9 @@ npx --yes --package @playwright/cli playwright-cli -s=bus-review run-code --file
 - 未部署遠端服務、未建置 CDN，未宣稱 CDN 命中率。HTTP cache 由官方 headers 與瀏覽器決定。
 - 殼層升級會重新整理舊頁面，尚未提交的選站內容不保留；已下載的 IndexedDB 資料會遷移保留。
 
-截圖保存在本機（ignored，未納入 Git）：
+展示用的桌面查詢與快取檢視截圖納入 `docs/images/`；其餘驗收截圖位於本機 `output/playwright/`（ignored，未納入 Git）：
 
 - [候選站群](../output/playwright/station-choices.png)
-- [262 桌面與完整站序](../output/playwright/stations-desktop.png)
+- [262 桌面與完整站序](images/bus-query.png)
 - [262 手機結果](../output/playwright/stations-mobile.png)
 - [舊版升級後離線查詢](../output/playwright/stations-upgrade-offline.png)
