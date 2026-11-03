@@ -1,10 +1,11 @@
-const CACHE = "taipei-bus-shell-v5";
+const CACHE = "taipei-bus-shell-v6";
 const FILES = [
   "./",
   "./index.html",
   "./icon.svg",
   "./app/style.css",
   "./app/ui.js",
+  "./app/cache-viewer.js",
   "./app/bridge.js",
   "./app/config.js",
   "./app/db.js",

@@ -1,5 +1,6 @@
 import { BusBridge } from "./bridge.js";
 import { validPosition } from "./groups.js";
+import { setupCacheViewer } from "./cache-viewer.js";
 
 const $ = (id) => document.getElementById(id);
 const selected = { start: null, end: null };
@@ -588,6 +589,7 @@ try {
       "請使用新版 Chrome、Edge、Firefox 或 Safari，並透過 localhost 或 HTTPS 開啟。",
     );
   bridge = new BusBridge();
+  setupCacheViewer(bridge);
   bridge.addEventListener("ready", (event) => {
     setMeta(event.detail);
     if (shellReady) $("shell-status").textContent = "已保存，可離線重開";

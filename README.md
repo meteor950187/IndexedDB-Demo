@@ -43,6 +43,14 @@ npx --yes --package @playwright/cli playwright-cli -s=bus-review close
 
 不同 origin（例如 localhost / 127.0.0.1 / 不同 port）有各自獨立快取。清除網站資料會移除 IndexedDB 與離線頁面。無痕模式或瀏覽器空間回收也可能使快取消失。
 
+## 展示 IndexedDB 快取
+
+頁首「網路已連線」旁的「查看快取資料」會開啟本機資料檢視視窗。可切換路線、實體站位、路線站序、站群及同步資訊五張資料表，查看實際筆數、主鍵、索引與每筆完整 JSON。資料每頁讀取 20 筆，依主鍵排序；站群筆數包含「全部站區」的上層群組。
+
+筆數使用 object store 的 `count()`，索引資訊讀自 IndexedDB schema，沒有寫死展示數字。檢視透過 Bridge 的唯讀入口，在同一個 transaction 讀取各表筆數、同步資訊及當頁資料；翻頁途中若資料版本已變更，會提示重新讀取。尚未下載時也能查看空資料庫。
+
+「重新讀取」只更新本機展示，不觸發官方資料下載；介面模組已加入 Service Worker 離線殼層。點關閉或按 Escape 可回到原查詢，起訖站與路線結果不因開關視窗而清除。
+
 ## 架構
 
 ```text

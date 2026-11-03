@@ -94,6 +94,74 @@ const result = (request) =>
   });
 export const readMeta = (db) =>
   result(db.transaction("meta").objectStore("meta").get("current"));
+
+// 展示面板直接讀 schema 與實際筆數；同一 readonly transaction 保持頁面資料一致。
+export async function inspectCache(db, options = {}) {
+  const name = options.store || "routes";
+  if (!STORES.includes(name)) throw new Error("未知的資料表");
+  const offset = Number.isSafeInteger(options.offset)
+    ? Math.max(0, options.offset)
+    : 0;
+  const limit = Number.isSafeInteger(options.limit)
+    ? Math.max(1, Math.min(50, options.limit))
+    : 20;
+  const tx = db.transaction(STORES, "readonly");
+  const summaries = Promise.all(
+    STORES.map(async (name) => {
+      const store = tx.objectStore(name);
+      const indexes = [...store.indexNames].map((name) => {
+        const index = store.index(name);
+        return {
+          name,
+          keyPath: index.keyPath,
+          multiEntry: index.multiEntry,
+          unique: index.unique,
+        };
+      });
+      return {
+        name,
+        keyPath: store.keyPath,
+        indexes,
+        count: await result(store.count()),
+      };
+    }),
+  );
+  const page = new Promise((resolve, reject) => {
+    const request = tx.objectStore(name).openCursor();
+    const rows = [];
+    let skipped = false;
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) return resolve(rows);
+      if (offset && !skipped) {
+        skipped = true;
+        cursor.advance(offset);
+        return;
+      }
+      rows.push(cursor.value);
+      if (rows.length === limit) resolve(rows);
+      else cursor.continue();
+    };
+  });
+  const [stores, rows, meta] = await Promise.all([
+    summaries,
+    page,
+    result(tx.objectStore("meta").get("current")),
+  ]);
+  if (options.expectedVersion && options.expectedVersion !== meta?.version)
+    throw new Error("資料版本已更新，請按「重新讀取」從第一頁查看。");
+  return {
+    databaseName: db.name,
+    schemaVersion: db.version,
+    stores,
+    rows,
+    meta: meta || null,
+    store: name,
+    offset,
+    limit,
+  };
+}
 export function replaceSnapshot(db, bundle, meta) {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORES, "readwrite");

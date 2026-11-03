@@ -1,5 +1,15 @@
 # 驗證紀錄
 
+## IndexedDB 展示視窗增補（2026-11-03）
+
+新增頁首「查看快取資料」按鈕與原生 dialog，直接展示五張 object store 的實際筆數、schema 索引、分頁內容及完整 JSON。新增兩個資料層測試後，`npm test` 合計 **15 個通過**：涵蓋實際 count 不取用過時 metadata、複合／multiEntry 索引、分頁不重複、所有資料表、空資料庫、唯讀不修改、筆數上限與版本不一致拒絕。
+
+在現有 in-app browser 親自驗證：五表切換、上一頁／下一頁（1–20 → 21–40）、重新讀取、展開真實 JSON、關閉按鈕、Escape 與焦點回到開啟按鈕。開關視窗前後保留 `262` 查詢與 `262／262區` 結果。390 × 844 手機尺寸檢查頁面及 dialog 均無水平溢出；桌面畫面亦已檢視。真實筆數為 routes 416、stops 5,376、routeStops 28,826、stationGroups 3,126（含上層站區）、meta 1。
+
+本次頁面由 shell-v5 自動升級至 shell-v6；新檢視模組列入殼層快取。空資料與版本衝突以資料層測試驗證，本次未另外模擬瀏覽器完全斷網。
+
+截圖：[快取檢視視窗](../output/playwright/cache-inspector-desktop.png)。
+
 日期：2026-11-03（Asia/Taipei）。環境：Windows、Node.js v24.15.0、Playwright CLI Chromium。基準為 `907a54d`，本次修正站群、逐名稱搜尋及既有資料升級。
 
 ## 官方資料與實際行程

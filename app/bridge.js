@@ -1,5 +1,5 @@
 import { settings } from "./config.js";
-import { openDatabase, query, readMeta } from "./db.js";
+import { openDatabase, query, readMeta, inspectCache } from "./db.js";
 
 export class BusBridge extends EventTarget {
   constructor(options = {}) {
@@ -77,6 +77,15 @@ export class BusBridge extends EventTarget {
   }
   async meta() {
     return readMeta(await this.database());
+  }
+  async inspectCache(options) {
+    // 首次下載失敗或仍在同步時，也能展示本機空資料庫。
+    const db = await openDatabase(this.settings.databaseName);
+    try {
+      return await inspectCache(db, options);
+    } finally {
+      db.close();
+    }
   }
   sync() {
     const requestId = crypto.randomUUID();

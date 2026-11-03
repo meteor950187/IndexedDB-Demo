@@ -20,9 +20,20 @@
         ><span class="brand-icon" aria-hidden="true">↗</span
         ><span>下一站台北<small>TAIPEI BUS / LOCAL FIRST</small></span></a
       >
-      <div class="network">
-        <span id="network-dot" class="dot"></span
-        ><span id="network-label">連線中</span>
+      <div class="header-tools">
+        <div class="network">
+          <span id="network-dot" class="dot"></span
+          ><span id="network-label">連線中</span>
+        </div>
+        <button
+          id="cache-open"
+          class="cache-open"
+          type="button"
+          aria-haspopup="dialog"
+          aria-controls="cache-dialog"
+        >
+          查看快取資料
+        </button>
       </div>
     </header>
     <main class="wrap">
@@ -294,6 +305,89 @@
         提供路線與站序參考，非即時到站預報。臨時改道與營運資訊請以官方公告為準。
       </p>
     </footer>
+    <dialog
+      id="cache-dialog"
+      class="cache-dialog"
+      aria-labelledby="cache-title"
+      aria-describedby="cache-intro"
+    >
+      <div class="cache-heading">
+        <div>
+          <p class="eyebrow">INSIDE THE BROWSER / 本機資料</p>
+          <h2 id="cache-title">打開你的 IndexedDB</h2>
+        </div>
+        <button
+          id="cache-close"
+          class="cache-close"
+          type="button"
+          aria-label="關閉快取資料"
+          autofocus
+        >
+          ✕
+        </button>
+      </div>
+      <p id="cache-intro">
+        公車資料下載後，就住在這個瀏覽器裡。搜尋與直達路線配對會讀取本機資料庫，離線也能使用。
+      </p>
+      <div class="cache-flow" aria-label="資料流程">
+        <span>官方 JSON</span><span aria-hidden="true">→</span
+        ><span>Worker 整理</span><span aria-hidden="true">→</span
+        ><strong>IndexedDB</strong><span aria-hidden="true">→</span
+        ><span>本機查詢</span>
+      </div>
+      <div class="cache-toolbar">
+        <p id="cache-database">正在讀取資料庫…</p>
+        <button id="cache-refresh" type="button" class="cache-action">
+          重新讀取
+        </button>
+      </div>
+      <p id="cache-saved" class="cache-note"></p>
+      <div
+        id="cache-stores"
+        class="cache-stores"
+        role="group"
+        aria-label="選擇資料表"
+      ></div>
+      <section id="cache-content" aria-label="資料表內容" aria-busy="false">
+        <h3 id="cache-store-title"></h3>
+        <p id="cache-store-description" class="cache-note"></p>
+        <div id="cache-indexes" class="cache-indexes"></div>
+        <p
+          id="cache-message"
+          class="cache-message"
+          role="status"
+          aria-live="polite"
+        ></p>
+        <div
+          id="cache-table-wrap"
+          class="cache-table-wrap"
+          role="region"
+          aria-label="快取資料表格，可橫向捲動"
+          tabindex="0"
+        >
+          <table id="cache-table"></table>
+        </div>
+        <div class="cache-pagination">
+          <span id="cache-range"></span>
+          <div>
+            <button id="cache-prev" type="button" class="cache-action">
+              上一頁</button
+            ><button id="cache-next" type="button" class="cache-action">
+              下一頁
+            </button>
+          </div>
+        </div>
+        <details id="cache-record" class="cache-record" hidden>
+          <summary id="cache-record-title">完整 JSON</summary>
+          <pre id="cache-json" tabindex="0"></pre>
+        </details>
+      </section>
+      <p class="cache-footnote">
+        這裡顯示實際儲存的資料，每頁讀取 20
+        筆。重新讀取只讀本機，不會下載官方檔案。離線頁面的 HTML／CSS／JS
+        另外保存在 Service Worker 的 Cache Storage。
+      </p>
+    </dialog>
     <noscript
       >此查詢需要開啟 JavaScript，才能使用 IndexedDB 與背景同步。</noscript
     >
