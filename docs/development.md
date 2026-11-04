@@ -73,7 +73,9 @@ npx --yes --package @playwright/cli playwright-cli -s=bus-review run-code --file
 
 ## 靜態部署與殼層更新
 
-部署檔案為 `index.html`、`icon.svg`、`sw.js` 與整個 `app/`。使用相對路徑，程式設計支援子目錄；正式託管需 HTTPS。儲存庫目前提供本機展示，尚未發布遠端站點。
+線上 Demo：[https://meteor950187.github.io/IndexedDB-Demo/](https://meteor950187.github.io/IndexedDB-Demo/)。GitHub Pages 設為從 `main` 分支的根目錄自動發布，根目錄 `.nojekyll` 讓檔案直接以靜態內容提供。後續更新推送或合併至 `main` 後，會觸發重新部署；只推送開發分支不會更新網站。
+
+應用程式所需檔案為 `index.html`、`icon.svg`、`sw.js` 與整個 `app/`。使用相對路徑，支援 GitHub Pages 的 `/IndexedDB-Demo/` 子目錄，Worker 與 Service Worker 也會由此路徑載入。GitHub 提供 HTTPS 靜態託管，官方資料由瀏覽器直接下載，不需要自建後端伺服器。本機與線上網址的 IndexedDB／Cache Storage 分開，首次開啟線上版本需要重新下載資料。
 
 修改頁面、樣式或模組後，需提高 `sw.js` 的 CACHE 版本；新增模組也需加入殼層檔案清單。新 Service Worker 完整安裝後，會更新同範圍的舊分頁並移除舊殼層。升級可能重新整理頁面，尚未提交的選站內容不保留；IndexedDB 資料則遷移保留。
 
